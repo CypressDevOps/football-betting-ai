@@ -1,0 +1,23 @@
+{
+  "name": "football-betting-ai",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn src/index.ts"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "cheerio": "^1.1.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/cheerio": "^0.22.35",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
