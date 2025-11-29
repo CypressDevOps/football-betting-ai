@@ -1,15 +1,12 @@
-// src/api/transfermarkt.ts
 import { http } from "../util/http.js";
-import cheerio from "cheerio";
-import { InjuryInfo } from "../types/types";
+import * as cheerio from "cheerio";
+import type { InjuryInfo } from "../types/types";
 
 /**
- * Hinweis: Transfermarkt hat keine offizielle API. Scraping ist fragil
- * und kann gegen Nutzungsbedingungen verstoßen. Verwende sparsam und
- * respektiere robots.txt und Rate Limits.
- * Prüfe Selektoren manuell.
+ * Scrape die Anzahl und Schwere von Verletzungen für einen Club
+ * Hinweis: Transfermarkt hat keine offizielle API. Selektoren prüfen!
  */
-export async function getInjuriesForClub(teamId: string, injuryPageUrl: string): Promise<InjuryInfo> {
+export async function getInjuriesForClub(injuryPageUrl: string): Promise<InjuryInfo> {
   try {
     const res = await http.get(injuryPageUrl);
     const $ = cheerio.load(res.data);
@@ -23,20 +20,19 @@ export async function getInjuriesForClub(teamId: string, injuryPageUrl: string):
       const status = tds.eq(4).text().trim() || tds.eq(5).text().trim();
       if (/long-term|out|doubtful|injur/i.test(status.toLowerCase())) {
         injuredPlayers += 1;
-        if (/long-term|out/i.test(status.toLowerCase())) injurySeverity += 1; // schwere Verletzung
-        else injurySeverity += 0.5; // leichte Verletzung
+        injurySeverity += /long-term|out/i.test(status.toLowerCase()) ? 1 : 0.5;
       }
     });
 
-    // Normalisiere injurySeverity auf 0..1
     const severityNormalized = injuredPlayers > 0 ? Math.min(1, injurySeverity / injuredPlayers) : 0;
 
     return {
-      teamId,
+      teamId: injuryPageUrl,  // hier als Key
       injuredPlayers,
       injurySeverity: severityNormalized
     };
   } catch (err: any) {
-    throw new Error(`Transfermarkt scrape failed for ${injuryPageUrl}: ${err.message || err}`);
+    console.warn(`Transfermarkt scrape failed for ${injuryPageUrl}: ${err.message || err}`);
+    return { teamId: injuryPageUrl, injuredPlayers: 0, injurySeverity: 0 };
   }
 }

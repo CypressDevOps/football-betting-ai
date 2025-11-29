@@ -25,14 +25,15 @@ export interface Form {
 
 export interface Match {
   id: string;
+  utcDate?: string;
+  status?: string;
   date?: string;
   homeTeam: { id?: string; name: string; league?: string };
   awayTeam: { id?: string; name: string; league?: string };
+  competitionId?: number;
   odds?: any;           // später füllen
   formHome?: number;
   formAway?: number;
-  injuriesHome?: number;
-  injuriesAway?: number;
   marketSignal?: number;
 }
 
