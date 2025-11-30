@@ -7,14 +7,16 @@ import { calculateTeamForm } from "../services/formService";
 
 const recService = new RecommendationService(1.8, 3); // minOdds = 1.8, topK = 3
 
-// Realistische Formwerte
+// Realistische Formwerte pro Team (0..1)
 const recentFormMap: Record<string, number> = {
   "FC Bayern München": 0.9,
   "FC St. Pauli 1910": 0.4,
   "SV Werder Bremen": 0.6,
   "1. FC Köln": 0.5,
   "1. FC Union Berlin": 0.7,
-  "1. FC Heidenheim 1846": 0.5
+  "1. FC Heidenheim 1846": 0.5,
+  "VfB Stuttgart": 0.6,
+  "FC Schalke 04": 0.3
 };
 
 // Odds extrahieren
@@ -30,9 +32,8 @@ interface MatchOdds {
 const getOddsForMatch = (matchKey: string, oddsEntries: OddsEntry[]): MatchOdds => {
   const entry = oddsEntries.find(o => o.matchKey === matchKey);
 
-  if (!entry) {
-    return { home: 1.8, draw: 3, away: 4, over25: 2, over35: 2.2, btts: 1.9 };
-  }
+  const fallback: MatchOdds = { home: 1.8, draw: 3, away: 4, over25: 2, over35: 2.2, btts: 1.9 };
+  if (!entry) return fallback;
 
   const odds: MatchOdds = { home: 0, draw: 0, away: 0, over25: 0, over35: 0, btts: 0 };
   const counts: Record<keyof MatchOdds, number> = { home: 0, draw: 0, away: 0, over25: 0, over35: 0, btts: 0 };
@@ -48,13 +49,8 @@ const getOddsForMatch = (matchKey: string, oddsEntries: OddsEntry[]): MatchOdds 
     }
   });
 
-  // Durchschnitt + Fallback
   (Object.keys(odds) as (keyof MatchOdds)[]).forEach(k => {
-    if (counts[k] > 0) odds[k] /= counts[k];
-    else {
-      const fallback: MatchOdds = { home: 1.8, draw: 3, away: 4, over25: 2, over35: 2.2, btts: 1.9 };
-      odds[k] = fallback[k];
-    }
+    odds[k] = counts[k] > 0 ? odds[k] / counts[k] : fallback[k];
   });
 
   return odds;
@@ -66,19 +62,24 @@ const calculateMarketSignal = (odds: { home: number; away: number }) =>
 
 (async () => {
   try {
-    const today = new Date();
-    const day = today.getDay(); // 0 = Sonntag, 6 = Samstag
+    // Aktuelles Wochenende
+const today = new Date();
+const day = today.getDay(); // 0 = Sonntag, 1 = Montag, ..., 6 = Samstag
 
-    // Nächstes Wochenende berechnen
-    const saturday = new Date(today);
-    saturday.setDate(today.getDate() + ((6 - day + 7) % 7));
-    const sunday = new Date(saturday);
-    sunday.setDate(saturday.getDate() + 1);
+// Tage bis Samstag und Sonntag
+const daysUntilSaturday = (6 - day + 7) % 7; // korrekt, Samstag
+const daysUntilSunday = (7 - day + 7) % 7;   // korrekt, Sonntag
 
-    const dateFrom = saturday.toISOString().split("T")[0];
-    const dateTo = sunday.toISOString().split("T")[0];
+const saturday = new Date(today);
+saturday.setDate(today.getDate() + daysUntilSaturday);
 
-    console.log(`Fetching matches: ${dateFrom} to ${dateTo}`);
+const sunday = new Date(today);
+sunday.setDate(today.getDate() + daysUntilSunday);
+
+// API-konforme Reihenfolge sicherstellen
+const dateFrom = saturday <= sunday ? saturday.toISOString().split("T")[0] : sunday.toISOString().split("T")[0];
+const dateTo   = saturday <= sunday ? sunday.toISOString().split("T")[0]   : saturday.toISOString().split("T")[0];
+
 
     // Matches & Odds abrufen
     const { matches, oddsEntries } = await gatherMatchData(dateFrom, dateTo);
@@ -87,11 +88,7 @@ const calculateMarketSignal = (odds: { home: number; away: number }) =>
     const enrichedMatches: Match[] = matches.map(m => {
       const matchKey = `${m.homeTeam.name} vs ${m.awayTeam.name}`;
       const odds = getOddsForMatch(matchKey, oddsEntries);
-
-      const marketSignal = calculateMarketSignal({
-        home: odds.home,
-        away: odds.away
-      }) + (Math.random() - 0.5) * 0.05;
+      const marketSignal = calculateMarketSignal({ home: odds.home, away: odds.away });
 
       return {
         ...m,
