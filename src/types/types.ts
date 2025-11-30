@@ -1,3 +1,5 @@
+import { KiPrediction } from "../services/kiPredictionService";
+
 export interface Team {
   id: string;
   name: string;
@@ -23,24 +25,33 @@ export interface Form {
   value: number;             // 0..1 normalisiert
 }
 
+// src/types/types.ts
 export interface Match {
   id: string;
   utcDate?: string;
   status?: string;
   date?: string;
+
   homeTeam: { id?: string; name: string; league?: string };
   awayTeam: { id?: string; name: string; league?: string };
+
   score?: { fullTime: { home: number; away: number } };
   competitionId?: number;
-  odds?: MatchOdds;
-  formHome?: number;
+
+  odds?: MatchOdds;          // OddsAPI-Daten
+  formHome?: number;         // berechnete Form
   formAway?: number;
-  marketSignal?: number;
+  marketSignal?: number;     // Markt- oder Verletzungs-Signal
+  homeTeamAdvantage?: number; // optional, z.B. 0.1 für Heimteam
 
   // Modelle / KI-Scores
-  scoreOver25?: number;   // 0..1
-  scoreOver35?: number;   // 0..1
+  kiPrediction?: KiPrediction; // optional, aus KiPredictionService
+  scoreOver25?: number;   
+  scoreOver35?: number;   
+  scoreBTTS?: number;       // neu
+  scoreHomeWin?: number;    // neu
 }
+
 
 
 // src/types/types.ts (oder direkt in runLiveTest.ts)

@@ -1,43 +1,48 @@
 // src/services/matchService.ts
 import { getUpcomingMatchesForCompetition } from "../api/footballData";
 import { getOddsForSportAndRegion, OddsEntry } from "../api/oddsApi";
-import { Match } from "../types/types";
+import type { Match } from "../types/types";
+import { calculateTeamForm } from "./formService";
 
-/**
- * Gather matches for DE/ES/UK for the upcoming weekend, fetch odds >= 1.8.
- */
 export async function gatherMatchData(
   dateFrom?: string,
   dateTo?: string
 ): Promise<{ matches: Match[]; oddsEntries: OddsEntry[] }> {
-  // v4-kompatible Liga-IDs
   const leagues = [
     { id: 2002, name: "Bundesliga" },
     { id: 2014, name: "LaLiga" },
-    { id: 2021, name: "Premier League" } // vorher Serie A
+    { id: 2021, name: "Premier League" }
   ];
 
-  const matchesArrays: Match[][] = [];
-
-  for (const league of leagues) {
-    try {
-      const url = `https://api.football-data.org/v4/competitions/${league.id}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
-      console.log(`Fetching matches: ${url}`);
-      const matchesForLeague = await getUpcomingMatchesForCompetition(league.id, dateFrom, dateTo);
-      matchesArrays.push(matchesForLeague);
-    } catch (err: any) {
-      console.error(`Fehler beim Abrufen der Matches für ${league.name} (${league.id}):`, err.message || err);
-    }
-  }
+  // 1️⃣ Alle Liga-Matches parallel abrufen
+  const matchesArrays = await Promise.all(
+    leagues.map(async (league) => {
+      try {
+        console.log(`Fetching matches: https://api.football-data.org/v4/competitions/${league.id}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`);
+        const matchesForLeague = await getUpcomingMatchesForCompetition(league.id, dateFrom, dateTo);
+        return matchesForLeague;
+      } catch (err: any) {
+        console.error(`Fehler beim Abrufen der Matches für ${league.name}:`, err.message || err);
+        return [];
+      }
+    })
+  );
 
   const matches = matchesArrays.flat();
 
-  // Odds abrufen
+  // 2️⃣ Odds abrufen
   let oddsEntries: OddsEntry[] = [];
   try {
     oddsEntries = await getOddsForSportAndRegion("soccer", "eu", "h2h", 1.8);
   } catch (err: any) {
     console.error("Fehler beim Abrufen der Odds:", err.message || err);
+  }
+
+  // 3️⃣ Form für jedes Team berechnen
+  for (const m of matches) {
+    m.formHome = calculateTeamForm(m.homeTeam.name, matches);
+    m.formAway = calculateTeamForm(m.awayTeam.name, matches);
+    m.marketSignal = 0; // neutral, da Verletzungen nicht verfügbar
   }
 
   return { matches, oddsEntries };

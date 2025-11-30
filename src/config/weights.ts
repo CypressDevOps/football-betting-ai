@@ -1,3 +1,4 @@
+// src/config/weights.ts
 export interface KIWeights {
   intercept: number;
   wForm: number;

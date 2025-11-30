@@ -10,3 +10,4 @@ export const requireEnv = (key: string): string => {
 
 export const FOOTBALL_DATA_API_KEY = requireEnv("FOOTBALL_DATA_API_KEY");
 export const ODDS_API_KEY = requireEnv("ODDS_API_KEY");
+export const OPENAI_API_KEY = requireEnv("OPENAI_API_KEY");
