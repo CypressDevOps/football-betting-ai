@@ -1,99 +1,91 @@
 // src/services/recommendationService.ts
-import { Match } from "../types/types";
-import { KIWeights, defaultWeights } from "../config/weights";
+import type { Match } from "../types/types";
 
 export interface Recommendation {
   matchKey: string;
   homeTeam: string;
   awayTeam: string;
-  betType: "1" | "OVER_2_5" | "BTTS";
-  odds: number;              // nur die Zahl für diesen Wett-Typ
+  betType: "1" | "2" | "Over 2,5" | "Over 3,5" | "Under 2,5" | "Under 3,5" | "Goal/Goal";
+  odds: number;
   kiScore: number;
   modelProbability: number;
-  over25?: number
-  btts?: number
 }
 
-
 export class RecommendationService {
-  constructor(private weights: KIWeights = defaultWeights) {}
+  constructor(private minOdds: number = 1.8, private topK: number = 3) {}
 
-  private logistic(x: number) {
-    return 1 / (1 + Math.exp(-x));
-  }
+  public generateRecommendations(matches: Match[]): Recommendation[] {
+  const allRecommendations: Recommendation[] = [];
+  const logistic = (x: number) => 1 / (1 + Math.exp(-x));
 
-  private computeKiScore(match: Match): number {
-    const formHome = match.formHome ?? 0.5;
-    const formAway = match.formAway ?? 0.5;
-    const formDiff = formHome - formAway;
+  for (const m of matches) {
+    const formHome = m.formHome ?? 0.5;
+    const formAway = m.formAway ?? 0.5;
+    const marketSignal = m.marketSignal ?? 0;
 
-    const homeEffect = 0.1;
-   
-    const marketSignal = match.marketSignal ?? 0;
+    const scoreHomeWin = logistic((formHome - formAway) + marketSignal);
+    const scoreOver25 = logistic((formHome + formAway) / 2 + marketSignal * 0.5);
+    const scoreOver35 = logistic((formHome + formAway) / 2 + marketSignal * 0.4);
+    const scoreBTTS = logistic((formHome * formAway) + marketSignal * 0.3);
 
-    const w = this.weights ?? defaultWeights;
-
-    const rawScore =
-      (w.intercept ?? 0) +
-      (w.wForm ?? 1) * formDiff +
-      (w.wHome ?? 1) * homeEffect +
-      (w.wMarket ?? 1) * marketSignal;
-
-    return this.logistic(rawScore);
-  }
-
-  private generateBets(match: Match, kiScore: number): Recommendation[] {
-    const matchKey = `${match.homeTeam.name} vs ${match.awayTeam.name}`;
-
-    // Hier: odds ist **nur eine Zahl** pro Wett-Typ
-    return [
+    const bets: Recommendation[] = [
       {
-        matchKey,
-        homeTeam: match.homeTeam.name,
-        awayTeam: match.awayTeam.name,
+        matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
+        homeTeam: m.homeTeam.name,
+        awayTeam: m.awayTeam.name,
         betType: "1",
-        odds: match.odds.home ?? 1.0,
-        kiScore,
-        modelProbability: kiScore
+        odds: m.odds?.home ?? 1.8,
+        kiScore: scoreHomeWin,
+        modelProbability: scoreHomeWin
       },
       {
-        matchKey,
-        homeTeam: match.homeTeam.name,
-        awayTeam: match.awayTeam.name,
-        betType: "OVER_2_5",
-        odds: match.odds.over25 ?? 1.0,
-        kiScore: kiScore * 0.9,
-        modelProbability: kiScore * 0.9
+        matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
+        homeTeam: m.homeTeam.name,
+        awayTeam: m.awayTeam.name,
+        betType: "Over 2,5",
+        odds: m.odds?.over25 ?? 2,
+        kiScore: scoreOver25,
+        modelProbability: scoreOver25
       },
       {
-        matchKey,
-        homeTeam: match.homeTeam.name,
-        awayTeam: match.awayTeam.name,
-        betType: "BTTS",
-        odds: match.odds.btts ?? 1.0,
-        kiScore: kiScore * 0.85,
-        modelProbability: kiScore * 0.85
+        matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
+        homeTeam: m.homeTeam.name,
+        awayTeam: m.awayTeam.name,
+        betType: "Over 3,5",
+        odds: m.odds?.over35 ?? 2.2,
+        kiScore: scoreOver35,
+        modelProbability: scoreOver35
+      },
+      {
+        matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
+        homeTeam: m.homeTeam.name,
+        awayTeam: m.awayTeam.name,
+        betType: "Goal/Goal",
+        odds: m.odds?.btts ?? 1.9,
+        kiScore: scoreBTTS,
+        modelProbability: scoreBTTS
       }
     ];
+
+    // Filter nach minOdds
+    allRecommendations.push(...bets.filter(b => b.odds >= this.minOdds));
   }
 
-  public generateRecommendations(
-    matches: Match[],
-    minOdds: number = 1.8,
-    topK: number = 3
-  ): Recommendation[] {
-    const allRecommendations: Recommendation[] = [];
-
-    for (const m of matches) {
-      const kiScore = this.computeKiScore(m);
-
-      const bets = this.generateBets(m, kiScore).filter(b => b.odds >= minOdds);
-      allRecommendations.push(...bets);
+  // Duplikate entfernen: gleiche matchKey + betType
+  const uniqueMap = new Map<string, Recommendation>();
+  for (const rec of allRecommendations) {
+    const key = `${rec.matchKey}|${rec.betType}`;
+    const existing = uniqueMap.get(key);
+    if (!existing || rec.modelProbability > existing.modelProbability || 
+        (rec.modelProbability === existing.modelProbability && rec.odds > existing.odds)) {
+      uniqueMap.set(key, rec);
     }
-
-    return allRecommendations
-      .sort((a, b) => b.modelProbability - a.modelProbability)
-      .slice(0, topK);
   }
+
+  // Sortiere nach Score, bei Gleichstand nach Quote
+  return Array.from(uniqueMap.values())
+    .sort((a, b) => b.modelProbability - a.modelProbability || b.odds - a.odds)
+    .slice(0, this.topK);
+}
 
 }
