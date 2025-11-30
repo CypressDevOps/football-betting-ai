@@ -19,57 +19,57 @@ export class RecommendationService {
   const logistic = (x: number) => 1 / (1 + Math.exp(-x));
 
   for (const m of matches) {
-    const formHome = m.formHome ?? 0.5;
-    const formAway = m.formAway ?? 0.5;
-    const marketSignal = m.marketSignal ?? 0;
+  const formHome = m.formHome ?? 0.5;
+  const formAway = m.formAway ?? 0.5;
+  const marketSignal = m.marketSignal ?? 0;
 
-    const scoreHomeWin = logistic((formHome - formAway) + marketSignal);
-    const scoreOver25 = logistic((formHome + formAway) / 2 + marketSignal * 0.5);
-    const scoreOver35 = logistic((formHome + formAway) / 2 + marketSignal * 0.4);
-    const scoreBTTS = logistic((formHome * formAway) + marketSignal * 0.3);
+  const scoreHomeWin = logistic((formHome - formAway) + marketSignal);
+  const scoreOver25 = logistic((formHome + formAway) / 2 + marketSignal * 0.5);
+  const scoreOver35 = logistic((formHome + formAway) / 2 + marketSignal * 0.4);
+  const scoreBTTS = logistic((formHome * formAway) + marketSignal * 0.3);
 
-    const bets: Recommendation[] = [
-      {
-        matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
-        homeTeam: m.homeTeam.name,
-        awayTeam: m.awayTeam.name,
-        betType: "1",
-        odds: m.odds?.home ?? 1.8,
-        kiScore: scoreHomeWin,
-        modelProbability: scoreHomeWin
-      },
-      {
-        matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
-        homeTeam: m.homeTeam.name,
-        awayTeam: m.awayTeam.name,
-        betType: "Over 2,5",
-        odds: m.odds?.over25 ?? 2,
-        kiScore: scoreOver25,
-        modelProbability: scoreOver25
-      },
-      {
-        matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
-        homeTeam: m.homeTeam.name,
-        awayTeam: m.awayTeam.name,
-        betType: "Over 3,5",
-        odds: m.odds?.over35 ?? 2.2,
-        kiScore: scoreOver35,
-        modelProbability: scoreOver35
-      },
-      {
-        matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
-        homeTeam: m.homeTeam.name,
-        awayTeam: m.awayTeam.name,
-        betType: "Goal/Goal",
-        odds: m.odds?.btts ?? 1.9,
-        kiScore: scoreBTTS,
-        modelProbability: scoreBTTS
-      }
-    ];
+  const bets: Recommendation[] = [
+    {
+      matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
+      homeTeam: m.homeTeam.name,
+      awayTeam: m.awayTeam.name,
+      betType: "1",
+      odds: m.odds?.home ?? 1.8,
+      kiScore: scoreHomeWin,
+      modelProbability: scoreHomeWin
+    },
+    {
+      matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
+      homeTeam: m.homeTeam.name,
+      awayTeam: m.awayTeam.name,
+      betType: "Over 2,5",
+      odds: m.odds?.over25 ?? 2,
+      kiScore: scoreOver25,
+      modelProbability: scoreOver25
+    },
+    {
+      matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
+      homeTeam: m.homeTeam.name,
+      awayTeam: m.awayTeam.name,
+      betType: "Over 3,5",
+      odds: m.odds?.over35 ?? 2.2,
+      kiScore: scoreOver35,
+      modelProbability: scoreOver35
+    },
+    {
+      matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
+      homeTeam: m.homeTeam.name,
+      awayTeam: m.awayTeam.name,
+      betType: "Goal/Goal",
+      odds: m.odds?.btts ?? 1.9,
+      kiScore: scoreBTTS,
+      modelProbability: scoreBTTS
+    }
+  ];
 
-    // Filter nach minOdds
-    allRecommendations.push(...bets.filter(b => b.odds >= this.minOdds));
-  }
+  allRecommendations.push(...bets.filter(b => b.odds >= this.minOdds));
+}
+
 
   // Duplikate entfernen: gleiche matchKey + betType
   const uniqueMap = new Map<string, Recommendation>();

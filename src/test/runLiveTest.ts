@@ -3,7 +3,6 @@ import { Recommendation, RecommendationService } from "../services/recommendatio
 import { gatherMatchData } from "../services/matchService";
 import type { Match } from "../types/types";
 import type { OddsEntry } from "../api/oddsApi";
-import { calculateTeamForm } from "../services/formService";
 
 const recService = new RecommendationService(1.8, 3); // minOdds = 1.8, topK = 3
 
@@ -101,8 +100,42 @@ const dateTo   = saturday <= sunday ? sunday.toISOString().split("T")[0]   : sat
       };
     });
 
+const topBetsPerMatch = enrichedMatches.flatMap(m => {
+  if (!m.odds) return []; // Schutz gegen undefined
+
+  const recs: Recommendation[] = [
+    {
+      matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
+      homeTeam: m.homeTeam.name,
+      awayTeam: m.awayTeam.name,
+      betType: "Over 2,5",
+      odds: m.odds.over25,
+      kiScore: m.scoreOver25 ?? 0,        // Fallback
+      modelProbability: m.scoreOver25 ?? 0
+    },
+    {
+      matchKey: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
+      homeTeam: m.homeTeam.name,
+      awayTeam: m.awayTeam.name,
+      betType: "Over 3,5",
+      odds: m.odds.over35,
+      kiScore: m.scoreOver35 ?? 0,        // Fallback
+      modelProbability: m.scoreOver35 ?? 0
+    }
+  ];
+
+  recs.sort((a, b) => b.kiScore - a.kiScore || b.odds - a.odds);
+  return recs[0];
+});
+
+
+
     // Top 3 Picks generieren
-    const picks: Recommendation[] = recService.generateRecommendations(enrichedMatches);
+   
+    const picks = topBetsPerMatch
+  .sort((a,b) => b.kiScore - a.kiScore) // Gesamtsortierung Top-K
+  .slice(0, 3);
+
 
     console.log("\n=== TOP 3 WETT-TIPPS DER KI FÜR DAS WOCHENENDE ===\n");
     picks.forEach((p, idx) => {

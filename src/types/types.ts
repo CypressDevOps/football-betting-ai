@@ -32,11 +32,16 @@ export interface Match {
   awayTeam: { id?: string; name: string; league?: string };
   score?: { fullTime: { home: number; away: number } };
   competitionId?: number;
-  odds?: any;           // später füllen
+  odds?: MatchOdds;
   formHome?: number;
   formAway?: number;
   marketSignal?: number;
+
+  // Modelle / KI-Scores
+  scoreOver25?: number;   // 0..1
+  scoreOver35?: number;   // 0..1
 }
+
 
 // src/types/types.ts (oder direkt in runLiveTest.ts)
 export interface MatchOdds {
